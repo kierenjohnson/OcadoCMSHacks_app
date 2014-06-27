@@ -1,0 +1,21 @@
+{
+  "name": "Ocado CMS Hacks App",
+  "description": "CMS pruned down to the barest essentials for managers.",
+  "version": "0.2.4",
+  "manifest_version": 2,
+
+  "app": {
+    "background": {
+      "scripts": ["js/vendor/angular-1.2.9.min.js","js/constants.js","js/cmsapi_v2.js","js/background.js"]
+    }
+  },
+
+  "icons": { "16": "images/cms_hacks_16.png", "128": "images/cms_hacks_128.png" },
+
+  "permissions": [
+    "storage",
+    "unlimitedStorage",
+    "notifications",
+    "http://change.ocado.com/"
+  ]
+}

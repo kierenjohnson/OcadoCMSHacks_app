@@ -1,0 +1,18 @@
+<div class="container">
+  <span style="float:right">{{cr.id}}</span>
+  <h3 ng-bind-html="cr.title"></h3>
+  <label for="businessReason">Business Reason</label>
+  <p ng-bind-html="cr.businessReason | breakFilter" id="businessReason"></p>
+  <label for="details">Details</label>
+  <p ng-bind-html="cr.details | breakFilter" id="details"></p>
+  <label for="impact">Impact</label>
+  <p ng-bind-html="cr.impact | breakFilter" id="impact"></p>
+</div>
+<div id="footer">
+  <div class="container">
+    <p><a href="#/changes/status/{{cr.statusCode}}">Return</a> |
+      <a class="pseudoLink" ng-click="doStatusChange(cr,'authorise')" target="_self" ng-show="showAction('Authorise')">Authorise</a> |
+      <a class="pseudoLink" ng-click="doStatusChange(cr,'reject')" target="_self" ng-show="showAction('Reject')">Reject</a> |
+      <a class="pseudoLink" ng-click="doStatusChange(cr,'confirm')" target="_self" ng-show="showAction('Confirm')">Confirm</a></p>
+  </div>
+</div>

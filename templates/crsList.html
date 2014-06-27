@@ -1,0 +1,12 @@
+<div class="container crlist">
+  <ul>
+    <li ng-repeat="cr in crs | orderObjectBy:'id'" ng-click="getCrDetailClick(cr)" ng-class="getClass(cr.actionDate)">
+      <span style="float:right;text-align:right;">{{cr.id}}<br/>{{cr.system}}<br/>{{cr.status}}</span><span ng-bind-html="cr.listHtml"></span>
+    </li>
+  </ul>
+</div>
+<div id="footer">
+  <div class="container">
+    <p><a class="pseudoLink" ng-click="doLogout()" target="_self">Logout</a></p>
+  </div>
+</div>
