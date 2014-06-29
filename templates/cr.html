@@ -1,12 +1,29 @@
 <div class="container">
-  <span style="float:right">{{cr.id}}</span>
-  <h3 ng-bind-html="cr.title"></h3>
-  <label for="businessReason">Business Reason</label>
-  <p ng-bind-html="cr.businessReason | breakFilter" id="businessReason"></p>
-  <label for="details">Details</label>
-  <p ng-bind-html="cr.details | breakFilter" id="details"></p>
-  <label for="impact">Impact</label>
-  <p ng-bind-html="cr.impact | breakFilter" id="impact"></p>
+  <h4 ng-bind-html="cr.title"></h4>
+  <dl class="dl-horizontal">
+    <dt>Business Reason</dt>
+    <dd ng-bind-html="cr.businessReason | breakFilter | htmlLinky"></dd><br/>
+    <dt>Details</dt>
+    <dd ng-bind-html="cr.details | breakFilter | htmlLinky"></dd><br/>
+    <dt>Impact</dt>
+    <dd ng-bind-html="cr.impact | breakFilter | htmlLinky"></dd>
+  </dl>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>System</th>
+        <th>Go Live Date</th>
+        <th>CR#</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>{{cr.system}}</td>
+        <td>{{cr.actionDate | date: 'd-MMM-yyyy HH:mm'}}</td>
+        <td>{{cr.id}}</td>
+      </tr>
+    </tbody>
+  </table>
 </div>
 <div id="footer">
   <div class="container">

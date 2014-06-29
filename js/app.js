@@ -67,6 +67,17 @@ cmsHacksApp.factory('dataFactory', ['$http', function($http) {
   return dataFactory;
 }]);
 
+cmsHacksApp.factory('analyticsTracker', function() {
+
+  // initialise google analytics service object
+  service = analytics.getService('cms_hacks_app');
+  //service.getConfig().addCallback(initAnalyticsConfig);
+
+  // Get a Tracker using your Google Analytics app Tracking ID.
+  return tracker = service.getTracker('UA-27869830-5');
+
+});
+
 // singleton service for storing session variables
 cmsHacksApp.service('Session', function () {
   this.create = function (userName, realName, cmsUserId, authorisingSystemIds, basicAuthToken, users, systems) {
@@ -96,7 +107,11 @@ cmsHacksApp.service('Session', function () {
 // Capture login event, store session variables and
 // change page to the crsList
 cmsHacksApp.controller('LoginController',
-  ['$scope','$location','Session',function($scope, $location, Session) {
+  ['$scope','$location','Session','analyticsTracker',function($scope, $location, Session, analyticsTracker) {
+
+  // Record an "appView" each time the user launches your app or goes to a new
+  // screen within the app.
+  analyticsTracker.sendAppView('LoginView');
 
   $scope.credentials = {
     username: '',
@@ -122,6 +137,8 @@ cmsHacksApp.controller('LoginController',
 
   $scope.login = function(credentials) {
 
+    analyticsTracker.sendEvent('Action', 'Login');
+
     Session.userName = credentials.username;
     Session.basicAuthToken = btoa(credentials.username + ":" + credentials.password);
 
@@ -137,8 +154,10 @@ cmsHacksApp.controller('LoginController',
 }]);
 
 // Main angular controller for app
-cmsHacksApp.controller('CRsController', ['$scope', '$timeout', '$routeParams', '$location', 'dataFactory', 'Session',
-  function($scope, $timeout, $routeParams, $location, dataFactory, Session) {
+cmsHacksApp.controller('CRsController', ['$scope', '$timeout', '$routeParams', '$location', 'dataFactory', 'Session','analyticsTracker',
+  function($scope, $timeout, $routeParams, $location, dataFactory, Session, analyticsTracker) {
+
+  analyticsTracker.sendAppView('CRListView');
 
   $scope.cmsUserId;
   $scope.systemAuthorisers = [];
@@ -258,6 +277,10 @@ cmsHacksApp.controller('CRsController', ['$scope', '$timeout', '$routeParams', '
   }
 
   $scope.fetchCRs = function(statusCode) {
+
+    // analytics
+    var timing = analyticsTracker.startTiming('API Performance', 'Fetch CRs');
+
     var newCRsList = []
 
     $scope.viewStatusCode = statusCode;
@@ -278,20 +301,23 @@ cmsHacksApp.controller('CRsController', ['$scope', '$timeout', '$routeParams', '
 
             // add cr to array
             newCRsList.push(loadCR(entry, Session));
+          });
 
-            // if we've processed all systems then clean up crs list
-            if (systemsCounter == systemsLength) {
-              // update scope crs
-              if (newCRsList.length == 0) {
-                newCRsList.push({id: '', title: 'No CRs found matching criteria.'});
-              }
-              $scope.crs = newCRsList;
-              if(!$scope.$$phase) {
-                $scope.$apply(function($scope){});
-              }
+          // if we've processed all systems then clean up crs list
+          if (systemsCounter == systemsLength) {
+            // update scope crs
+            if (newCRsList.length == 0) {
+              newCRsList.push({listHtml: '<p class="text-center"><strong>No CRs found</strong></p>'});
+            }
+            $scope.crs = newCRsList;
+            if(!$scope.$$phase) {
+              $scope.$apply(function($scope){});
             }
 
-          });
+            // send performance analytics
+            timing.send();
+          }
+
 
         }, this).
         error(function(err) {
@@ -319,12 +345,17 @@ cmsHacksApp.controller('CRsController', ['$scope', '$timeout', '$routeParams', '
 
   // handle cr box click events
   $scope.getCrDetailClick = function(cr) {
-    $scope.enableAutoRefresh = false;
-    $location.path('/changes/' + cr.id);
+    // don't fetch CR if there is no id
+    if (cr.id) {
+      $scope.enableAutoRefresh = false;
+      $location.path('/changes/' + cr.id);
+    }
   }
 
   // logout
   $scope.doLogout = function() {
+
+    analyticsTracker.sendEvent('Action', 'Logout');
 
     Session.destroy();
     $scope.enableAutoRefresh = false;
@@ -334,7 +365,7 @@ cmsHacksApp.controller('CRsController', ['$scope', '$timeout', '$routeParams', '
   // fetch details every 10 seconds
   var autoRefresh = function() {
     if ($scope.enableAutoRefresh) $scope.fetchUsers();
-    $timeout(autoRefresh, 10000);
+    $timeout(autoRefresh, 20000);
   }
 
   // this will start chain of get requests
@@ -344,7 +375,9 @@ cmsHacksApp.controller('CRsController', ['$scope', '$timeout', '$routeParams', '
 
 // CR detail view
 cmsHacksApp.controller('CRController',
-  ['$scope','$rootScope','$routeParams','dataFactory','$location','Session',function($scope, $rootScope, $routeParams, dataFactory, $location, Session) {
+  ['$scope','$rootScope','$routeParams','dataFactory','$location','Session','analyticsTracker',function($scope, $rootScope, $routeParams, dataFactory, $location, Session, analyticsTracker) {
+
+  analyticsTracker.sendAppView('CRDetailView');
 
   $rootScope.loading = true;
 
@@ -394,6 +427,7 @@ cmsHacksApp.controller('CRController',
     $rootScope.loading = true;
     dataFactory.updateCRStatus(cr.id, status, Session.basicAuthToken, false).
         success(function() {
+          analyticsTracker.sendEvent('Action', 'CR Status Change', status);
           $rootScope.loading = false;
           $location.path('/changes');
         }).
@@ -473,6 +507,42 @@ cmsHacksApp.filter('breakFilter', function () {
     return function (text) {
         if (text !== undefined) return text.replace(/\n/g, '<br />');
     };
+});
+
+// convert urls into links
+cmsHacksApp.filter('htmlLinky', function($sanitize, linkyFilter) {
+  var ELEMENT_NODE = 1;
+  var TEXT_NODE = 3;
+  var linkifiedDOM = document.createElement('div');
+  var inputDOM = document.createElement('div');
+
+  var linkify = function linkify(startNode) {
+    var i, currentNode;
+
+    for (i = 0; i < startNode.childNodes.length; i++) {
+      currentNode = startNode.childNodes[i];
+
+      switch (currentNode.nodeType) {
+        case ELEMENT_NODE:
+          linkify(currentNode);
+          break;
+        case TEXT_NODE:
+          linkifiedDOM.innerHTML = linkyFilter(currentNode.textContent);
+          i += linkifiedDOM.childNodes.length - 1
+          while(linkifiedDOM.childNodes.length) {
+            startNode.insertBefore(linkifiedDOM.childNodes[0], currentNode);
+          }
+          startNode.removeChild(currentNode);
+      }
+    }
+
+    return startNode;
+  };
+
+  return function(input) {
+    inputDOM.innerHTML = input;
+    return linkify(inputDOM).innerHTML;
+  };
 });
 
 cmsHacksApp.directive('formAutofillFix', function ($timeout) {
