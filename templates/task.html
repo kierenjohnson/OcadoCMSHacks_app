@@ -1,0 +1,30 @@
+<div class="container">
+  <h4 ng-bind-html="task.title"></h4>
+  <dl class="dl-horizontal">
+    <dt>Details</dt>
+    <dd ng-bind-html="task.details | breakFilter | htmlLinky"></dd><br/>
+    <dt>Backout</dt>
+    <dd ng-bind-html="task.backout | breakFilter | htmlLinky"></dd><br/>
+  </dl>
+  <table id="taskSubDetailTable" class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>System</th>
+        <th>Go Live Date</th>
+        <th>Team</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>{{task.system}}</td>
+        <td ng-class="getActionDateClass(task.actionDate)">{{task.actionDate | date: 'd-MMM-yyyy HH:mm'}}</td>
+        <td>{{task.team}}</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+<div id="footer">
+  <div class="container">
+    <p><a href="#/changes/{{task.changeId}}">Return</a></p>
+  </div>
+</div>

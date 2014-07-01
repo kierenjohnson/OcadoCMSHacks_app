@@ -1,63 +1,4 @@
-// dates for comparison later - how to refresh these?
-var today;
-var dayAfterTom;
-var tomorrow;
-var yesterday;
-var dayBeforeYesterday;
 
-function refreshDates() {
-  var now = new Date();
-  today = new Date(now.getFullYear(),now.getMonth(),now.getDate());
-  var temp = new Date();
-  dayAfterTom = new Date(temp.getFullYear(), temp.getMonth(), temp.getDate());
-  tomorrow = new Date(temp.getFullYear(), temp.getMonth(), temp.getDate());
-  yesterday = new Date(temp.getFullYear(), temp.getMonth(), temp.getDate());
-  dayBeforeYesterday = new Date(temp.getFullYear(), temp.getMonth(), temp.getDate());
-
-  tomorrow.setDate(today.getDate() + 1);
-  dayAfterTom.setDate(today.getDate() + 2);
-  yesterday.setDate(today.getDate() - 1);
-  dayBeforeYesterday.setDate(today.getDate() - 2);
-
-  // refresh dates every 5 minutes
-  setTimeout(refreshDates, 5*60*1000);
-}
-refreshDates();
-
-// utility functions to find stuff from id/username
-function getUserByUserName(users, userName) {
-  for (i = 0; i < users.length; i++) {
-    if (users[i].userName == userName) {
-      return users[i];
-    }
-  }
-}
-
-function getById(list, id) {
-  for (i = 0; i < list.length; i++) {
-    if (list[i].id == id) {
-      return list[i];
-    }
-  }
-}
-
-function loadCR(entry, Session) {
-  return {
-    id: entry.id,
-    title: entry.title,
-    actionDate: entry.actionAt*1000,
-    raisedAt: entry.raisedAt*1000,
-    status: getById(Session.statuses, entry.status).description,
-    statusCode: entry.status,
-    raisedBy: getById(Session.users, entry.raisedBy).realName,
-    details: entry.details,
-    system: getById(Session.systems, entry.systemId).systemName,
-    businessReason: entry.businessReason,
-    impact: entry.impact,
-    listHtml: '<strong>' + entry.title + '</strong><br/>' +
-    'Action: ' + formatDate(new Date(entry.actionAt*1000), 'd-MMM-yyyy HH:mm') + '<br/>Raiser: ' + getById(Session.users, entry.raisedBy).realName
-  }
-}
 // define the application
 var cmsHacksApp = angular.module('cmsHacksApp', ['ngRoute','ngSanitize']);
 
@@ -67,6 +8,7 @@ cmsHacksApp.factory('dataFactory', ['$http', function($http) {
   return dataFactory;
 }]);
 
+// google anayltics tracker factory
 cmsHacksApp.factory('analyticsTracker', function() {
 
   // initialise google analytics service object
@@ -75,8 +17,8 @@ cmsHacksApp.factory('analyticsTracker', function() {
 
   // Get a Tracker using your Google Analytics app Tracking ID.
   return tracker = service.getTracker('UA-27869830-5');
-
 });
+
 
 // singleton service for storing session variables
 cmsHacksApp.service('Session', function () {
@@ -89,6 +31,7 @@ cmsHacksApp.service('Session', function () {
     this.users = users; // all users of the system (needed to lookup raisers etc)
     this.systems = systems; // all cms systems
     this.statuses = statuses; // all cms status codes
+    this.teams = teams; // all cms teams
   };
   this.destroy = function () {
     this.userName = null;
@@ -99,9 +42,34 @@ cmsHacksApp.service('Session', function () {
     this.users = null;
     this.systems = null;
     this.statuses = null;
+    this.teams = null;
   };
   return this;
 })
+
+cmsHacksApp.controller('MainController',
+  ['$scope','$location','analyticsTracker',function($scope, $location, analyticsTracker) {
+
+  // initialise loading spinner display to false
+  $scope.loading = false;
+
+  $scope.query = {
+    crId: ''
+  };
+
+  $scope.isLoggedIn = function() {
+    return ($location.path() != '/');
+  }
+
+  $scope.search = function(query) {
+    if (query.crId) {
+      analyticsTracker.sendEvent('Action', 'Search');
+      // redirect
+      $location.path('/changes/' + query.crId);
+    }
+  }
+
+}]);
 
 // Controller for the login page
 // Capture login event, store session variables and
@@ -276,6 +244,16 @@ cmsHacksApp.controller('CRsController', ['$scope', '$timeout', '$routeParams', '
     });
   }
 
+  $scope.fetchTeams = function() {
+    dataFactory.getTeams(Session.basicAuthToken, true).
+      success(function(resp, status, headers, config) {
+        Session.teams = resp.teams;
+      }).
+      error(function(err) {
+      // TODO: Handle error
+    });
+  }
+
   $scope.fetchCRs = function(statusCode) {
 
     // analytics
@@ -288,7 +266,10 @@ cmsHacksApp.controller('CRsController', ['$scope', '$timeout', '$routeParams', '
     var systemsLength = Session.authorisingSystemIds.length;
     var systemsCounter = 0;
     Session.authorisingSystemIds.forEach(function(systemId, i){
-      dataFactory.getCRs(systemId, statusCode, Session.basicAuthToken, false).
+      dataFactory.getCRs({'systemId':systemId,
+                          'status':statusCode,
+                          'afterDate':getTodayDate().setDate(today.getDate() - 7)},
+                          Session.basicAuthToken, false).
         // success(crsSuccessCallback).
         success(function(resp, status, headers, config) {
 
@@ -307,7 +288,7 @@ cmsHacksApp.controller('CRsController', ['$scope', '$timeout', '$routeParams', '
           if (systemsCounter == systemsLength) {
             // update scope crs
             if (newCRsList.length == 0) {
-              newCRsList.push({listHtml: '<p class="text-center"><strong>No CRs found</strong></p>'});
+              newCRsList.push({listHtml: '<p class="text-center"><strong>Nothing to see here</strong><br/><small>Are your teams working hard enough?</small></p>'});
             }
             $scope.crs = newCRsList;
             if(!$scope.$$phase) {
@@ -326,27 +307,15 @@ cmsHacksApp.controller('CRsController', ['$scope', '$timeout', '$routeParams', '
     });
   }
 
-  $scope.getClass = function(actionDateTimeMilli) {
-    var actionDateTime = new Date(actionDateTimeMilli);
-    var actionDate = new Date(actionDateTime.getFullYear(),actionDateTime.getMonth(),actionDateTime.getDate());
-
-    if (actionDate.getTime() == today.getTime()) {
-      return 'actionToday';
-    } else if (actionDate.getTime() == yesterday.getTime()) {
-      return 'actionYesterday';
-    } else if (actionDate.getTime() == tomorrow.getTime()) {
-      return 'actionTomorrow';
-    } else if (actionDate.getTime() == dayBeforeYesterday.getTime()) {
-      return 'actionDayBeforeYesterday';
-    } else if (actionDate.getTime() == dayAfterTom.getTime()) {
-      return 'actionDayAfterTomorrow';
-    }
+  $scope.getActionDateClass = function(actionDateTimeMilli) {
+    return getActionDateClass(actionDateTimeMilli);
   }
 
   // handle cr box click events
   $scope.getCrDetailClick = function(cr) {
     // don't fetch CR if there is no id
     if (cr.id) {
+      analyticsTracker.sendEvent('Action', 'Get CR detail');
       $scope.enableAutoRefresh = false;
       $location.path('/changes/' + cr.id);
     }
@@ -370,6 +339,7 @@ cmsHacksApp.controller('CRsController', ['$scope', '$timeout', '$routeParams', '
 
   // this will start chain of get requests
   $scope.fetchStatuses();
+  $scope.fetchTeams();
 
 }]);
 
@@ -379,11 +349,11 @@ cmsHacksApp.controller('CRController',
 
   analyticsTracker.sendAppView('CRDetailView');
 
-  $rootScope.loading = true;
+  $scope.$parent.loading = true;
 
   function crSuccessCallback(resp, status, headers, config) {
     $scope.cr = loadCR(resp.changes, Session);
-    $rootScope.loading = false;
+    $scope.$parent.loading = false;
   }
 
   $scope.getCR = function() {
@@ -391,7 +361,7 @@ cmsHacksApp.controller('CRController',
         success(crSuccessCallback).
         error(function(err) {
         // TODO: Handle error
-        $rootScope.loading = false;
+        $scope.$parent.loading = false;
     });
   }
 
@@ -421,32 +391,35 @@ cmsHacksApp.controller('CRController',
     }
   }
 
+  $scope.getActionDateClass = function(actionDateTimeMilli) {
+    return getActionDateClass(actionDateTimeMilli);
+  }
 
   // handle status change events
   $scope.doStatusChange = function(cr, status) {
-    $rootScope.loading = true;
+    $scope.$parent.loading = true;
     dataFactory.updateCRStatus(cr.id, status, Session.basicAuthToken, false).
         success(function() {
           analyticsTracker.sendEvent('Action', 'CR Status Change', status);
-          $rootScope.loading = false;
+          $scope.$parent.loading = false;
           $location.path('/changes');
         }).
         error(function(err) {
         // TODO: Handle error
-        $rootScope.loading = false;
+        $scope.$parent.loading = false;
     });
   }
   $scope.doRescheduleCRToday = function(cr) {
-    $rootScope.loading = true;
+    $scope.$parent.loading = true;
     dataFactory.rescheduleCR(cr.id, new Date().getDate(), Session.basicAuthToken).
       success(function() {
         // reload CR
-        $rootScope.loading = false;
+        $scope.$parent.loading = false;
         $scope.getCR();
       }).
       error(function(err) {
       // TODO: Handle error
-      $rootScope.loading = false;
+      $scope.$parent.loading = false;
     });
   }
 
@@ -454,6 +427,38 @@ cmsHacksApp.controller('CRController',
   $scope.getCR();
 
 }]);
+
+// Task detail view
+cmsHacksApp.controller('TaskController',
+  ['$scope','$rootScope','$routeParams','dataFactory','$location','Session','analyticsTracker',function($scope, $rootScope, $routeParams, dataFactory, $location, Session, analyticsTracker) {
+
+  analyticsTracker.sendAppView('TaskDetailView');
+
+  $scope.$parent.loading = true;
+
+  function getTaskSuccessCallback(resp, status, headers, config) {
+    $scope.task = loadTask(resp.tasks, Session);
+    $scope.$parent.loading = false;
+  }
+
+  $scope.getTask = function() {
+    dataFactory.getTask($routeParams.id, Session.basicAuthToken, false).
+        success(getTaskSuccessCallback).
+        error(function(err) {
+        // TODO: Handle error
+        $scope.$parent.loading = false;
+    });
+  }
+
+  $scope.getActionDateClass = function(actionDateTimeMilli) {
+    return getActionDateClass(actionDateTimeMilli);
+  }
+
+  // get task
+  $scope.getTask();
+
+}]);
+
 
 cmsHacksApp.config(function($routeProvider) {
   $routeProvider
@@ -472,6 +477,10 @@ cmsHacksApp.config(function($routeProvider) {
     .when('/changes/:id', {
       templateUrl: 'templates/cr.html',
       controller: 'CRController'
+    })
+    .when('/tasks/:id', {
+      templateUrl: 'templates/task.html',
+      controller: 'TaskController'
     })
     .otherwise({redirectTo: '/'});
 });

@@ -1,12 +1,15 @@
 <div class="container crlist">
   <ul>
-    <li ng-repeat="cr in crs | orderObjectBy:'id'" ng-click="getCrDetailClick(cr)" ng-class="getClass(cr.actionDate)">
+    <li ng-repeat="cr in crs | orderObjectBy:'id'" ng-click="getCrDetailClick(cr)" ng-class="getActionDateClass(cr.actionDate)">
       <span style="float:right;text-align:right;">{{cr.id}}<br/>{{cr.system}}<br/>{{cr.status}}</span><span ng-bind-html="cr.listHtml"></span>
     </li>
   </ul>
 </div>
 <div id="footer">
   <div class="container">
+    <span ng-show="true" class="pull-right">
+      <span class="glyphicon glyphicon-flash" title="Disonnected"></span>
+    </span>
     <p><a class="pseudoLink" ng-click="doLogout()" target="_self">Logout</a></p>
   </div>
 </div>

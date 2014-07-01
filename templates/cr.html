@@ -8,7 +8,7 @@
     <dt>Impact</dt>
     <dd ng-bind-html="cr.impact | breakFilter | htmlLinky"></dd>
   </dl>
-  <table class="table table-bordered table-condensed">
+  <table id="crSubDetailTable" class="table table-bordered table-condensed">
     <thead>
       <tr>
         <th>System</th>
@@ -19,8 +19,22 @@
     <tbody>
       <tr>
         <td>{{cr.system}}</td>
-        <td>{{cr.actionDate | date: 'd-MMM-yyyy HH:mm'}}</td>
+        <td ng-class="getActionDateClass(cr.actionDate)">{{cr.actionDate | date: 'd-MMM-yyyy HH:mm'}}</td>
         <td>{{cr.id}}</td>
+      </tr>
+    </tbody>
+  </table>
+  <table id="crTasksTable" class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Tasks</th>
+        <th>Team</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr ng-repeat="task in cr.tasks | orderObjectBy:'id'">
+        <td><a href="#/tasks/{{task.id}}" >{{task.title}}</a></td>
+        <td>{{task.team}}</td>
       </tr>
     </tbody>
   </table>
@@ -28,8 +42,8 @@
 <div id="footer">
   <div class="container">
     <p><a href="#/changes/status/{{cr.statusCode}}">Return</a> |
-      <a class="pseudoLink" ng-click="doStatusChange(cr,'authorise')" target="_self" ng-show="showAction('Authorise')">Authorise</a> |
-      <a class="pseudoLink" ng-click="doStatusChange(cr,'reject')" target="_self" ng-show="showAction('Reject')">Reject</a> |
-      <a class="pseudoLink" ng-click="doStatusChange(cr,'confirm')" target="_self" ng-show="showAction('Confirm')">Confirm</a></p>
+      <a class="pseudoLink" ng-click="doStatusChange(cr,'authorise')" target="_self" ng-show="showAction('Authorise')" title="Authorise">Authorise</a> |
+      <a class="pseudoLink" ng-click="doStatusChange(cr,'reject')" target="_self" ng-show="showAction('Reject')" title="Reject">Reject</a> |
+      <a class="pseudoLink" ng-click="doStatusChange(cr,'confirm')" target="_self" ng-show="showAction('Confirm')" title="Confirm">Confirm</a></p>
   </div>
 </div>

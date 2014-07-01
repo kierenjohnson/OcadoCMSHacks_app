@@ -1,7 +1,7 @@
 {
   "name": "Ocado CMS Hacks App",
   "description": "CMS pruned down to the barest essentials for managers.",
-  "version": "0.2.6",
+  "version": "0.2.8",
   "manifest_version": 2,
 
   "app": {
