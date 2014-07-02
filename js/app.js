@@ -1,4 +1,3 @@
-
 // define the application
 var cmsHacksApp = angular.module('cmsHacksApp', ['ngRoute','ngSanitize']);
 
@@ -45,10 +44,49 @@ cmsHacksApp.service('Session', function () {
     this.teams = null;
   };
   return this;
-})
+});
 
-cmsHacksApp.controller('MainController',
-  ['$scope','$location','analyticsTracker',function($scope, $location, analyticsTracker) {
+// define constants for authentication issues
+cmsHacksApp.constant('AUTH_EVENTS', {
+  loginSuccess: 'auth-login-success',
+  loginFailed: 'auth-login-failed',
+  logoutSuccess: 'auth-logout-success',
+  sessionTimeout: 'auth-session-timeout',
+  notAuthenticated: 'auth-not-authenticated',
+  notAuthorized: 'auth-not-authorized'
+});
+
+// create an authentication interceptor
+cmsHacksApp.config(function ($httpProvider) {
+  $httpProvider.interceptors.push([
+    '$injector',
+    function ($injector) {
+      return $injector.get('AuthInterceptor');
+    }
+  ]);
+});
+
+cmsHacksApp.factory('AuthInterceptor', function ($rootScope, $q, AUTH_EVENTS) {
+  return {
+    responseError: function (response) {
+      if (response.status === 401) {
+        $rootScope.$broadcast(AUTH_EVENTS.notAuthenticated,
+                              response);
+      }
+      if (response.status === 403) {
+        $rootScope.$broadcast(AUTH_EVENTS.notAuthorized,
+                              response);
+      }
+      if (response.status === 419 || response.status === 440) {
+        $rootScope.$broadcast(AUTH_EVENTS.sessionTimeout,
+                              response);
+      }
+      return $q.reject(response);
+    }
+  };
+});
+
+cmsHacksApp.controller('MainController', function($scope, $rootScope, $location, analyticsTracker, AUTH_EVENTS) {
 
   // initialise loading spinner display to false
   $scope.loading = false;
@@ -65,17 +103,21 @@ cmsHacksApp.controller('MainController',
     if (query.crId) {
       analyticsTracker.sendEvent('Action', 'Search');
       // redirect
+      $rootScope.$broadcast('VIEW_CR_DETAIL', query.crId);
       $location.path('/changes/' + query.crId);
     }
   }
 
-}]);
+  $scope.$on(AUTH_EVENTS.notAuthenticated, function(event, mass) {
+    console.log(mass)
+  });
+
+});
 
 // Controller for the login page
 // Capture login event, store session variables and
 // change page to the crsList
-cmsHacksApp.controller('LoginController',
-  ['$scope','$location','Session','analyticsTracker',function($scope, $location, Session, analyticsTracker) {
+cmsHacksApp.controller('LoginController',function($scope, $rootScope, $location, Session, analyticsTracker, AUTH_EVENTS) {
 
   // Record an "appView" each time the user launches your app or goes to a new
   // screen within the app.
@@ -116,14 +158,15 @@ cmsHacksApp.controller('LoginController',
 
     // redirect
     $location.path('/changes');
-
   }
 
-}]);
+  // $rootScope.$broadcast(AUTH_EVENTS.notAuthenticated, 'this is a message');
+
+});
 
 // Main angular controller for app
-cmsHacksApp.controller('CRsController', ['$scope', '$timeout', '$routeParams', '$location', 'dataFactory', 'Session','analyticsTracker',
-  function($scope, $timeout, $routeParams, $location, dataFactory, Session, analyticsTracker) {
+cmsHacksApp.controller('CRsController',
+  function($scope, $rootScope, $timeout, $routeParams, $location, dataFactory, Session, analyticsTracker) {
 
   analyticsTracker.sendAppView('CRListView');
 
@@ -147,7 +190,6 @@ cmsHacksApp.controller('CRsController', ['$scope', '$timeout', '$routeParams', '
     Session.realName = u.realName;
 
     $scope.fetchAuthorisingSystems();
-
   }
 
   function systemAuthorisersSuccessCallback(resp, status, headers, config) {
@@ -281,7 +323,9 @@ cmsHacksApp.controller('CRsController', ['$scope', '$timeout', '$routeParams', '
           resp.changes.forEach(function(entry, i) {
 
             // add cr to array
-            newCRsList.push(loadCR(entry, Session));
+            if (!(statusCode == 'F' && entry.confirmationStatus != null)) {
+              newCRsList.push(loadCR(entry, Session));
+            }
           });
 
           // if we've processed all systems then clean up crs list
@@ -316,7 +360,7 @@ cmsHacksApp.controller('CRsController', ['$scope', '$timeout', '$routeParams', '
     // don't fetch CR if there is no id
     if (cr.id) {
       analyticsTracker.sendEvent('Action', 'Get CR detail');
-      $scope.enableAutoRefresh = false;
+      $rootScope.$broadcast('VIEW_CR_DETAIL', cr.id);
       $location.path('/changes/' + cr.id);
     }
   }
@@ -337,15 +381,19 @@ cmsHacksApp.controller('CRsController', ['$scope', '$timeout', '$routeParams', '
     $timeout(autoRefresh, 20000);
   }
 
+  $scope.$on('VIEW_CR_DETAIL', function(event, mass) {
+    console.log('VIEW_CR_DETAIL event: disable auto refresh of CRs list')
+    $scope.enableAutoRefresh = false;
+  });
+
   // this will start chain of get requests
   $scope.fetchStatuses();
   $scope.fetchTeams();
 
-}]);
+});
 
 // CR detail view
-cmsHacksApp.controller('CRController',
-  ['$scope','$rootScope','$routeParams','dataFactory','$location','Session','analyticsTracker',function($scope, $rootScope, $routeParams, dataFactory, $location, Session, analyticsTracker) {
+cmsHacksApp.controller('CRController', function($scope, $rootScope, $routeParams, dataFactory, $location, Session, analyticsTracker) {
 
   analyticsTracker.sendAppView('CRDetailView');
 
@@ -370,19 +418,19 @@ cmsHacksApp.controller('CRController',
     if ($scope.cr) {
       switch (action) {
       case "Authorise":
-        if ($scope.cr.status == 'Pend Auth') {
+        if ($scope.cr.statusCode == 'E' || $scope.cr.statusCode == 'P') {
           return true;
         }
         return false;
         break;
       case "Reject":
-        if ($scope.cr.status == 'Pend Auth' || $scope.cr.status == 'Pend Signoff') {
+        if ($scope.cr.statusCode == 'E' || $scope.cr.statusCode == 'P' || $scope.cr.statusCode == 'M') {
           return true;
         }
         return false;
         break;
       case "Confirm":
-        if ($scope.cr.status == 'Finished') {
+        if ($scope.cr.statusCode == 'F' && $scope.cr.confirmationStatus == null) {
           return true;
         }
         return false;
@@ -396,9 +444,15 @@ cmsHacksApp.controller('CRController',
   }
 
   // handle status change events
-  $scope.doStatusChange = function(cr, status) {
+  $scope.doStatusChange = function(cr, status, success) {
     $scope.$parent.loading = true;
-    dataFactory.updateCRStatus(cr.id, status, Session.basicAuthToken, false).
+    var data;
+    if (success) {
+      data = {'action': status, 'success': success};
+    } else {
+      data = {'action': status};
+    }
+    dataFactory.updateCRStatus(cr.id, data, Session.basicAuthToken, false).
         success(function() {
           analyticsTracker.sendEvent('Action', 'CR Status Change', status);
           $scope.$parent.loading = false;
@@ -426,11 +480,10 @@ cmsHacksApp.controller('CRController',
   // get CR
   $scope.getCR();
 
-}]);
+});
 
 // Task detail view
-cmsHacksApp.controller('TaskController',
-  ['$scope','$rootScope','$routeParams','dataFactory','$location','Session','analyticsTracker',function($scope, $rootScope, $routeParams, dataFactory, $location, Session, analyticsTracker) {
+cmsHacksApp.controller('TaskController', function($scope, $rootScope, $routeParams, dataFactory, $location, Session, analyticsTracker) {
 
   analyticsTracker.sendAppView('TaskDetailView');
 
@@ -457,7 +510,7 @@ cmsHacksApp.controller('TaskController',
   // get task
   $scope.getTask();
 
-}]);
+});
 
 
 cmsHacksApp.config(function($routeProvider) {

@@ -51,8 +51,8 @@ function DataFactory($http) {
       return $http.get(url, getConfig(basicAuthToken, cache));
     };
 
-    dataFactory.updateCRStatus = function (id, action, basicAuthToken, cache) {
-      return $http.put(urlBase + 'changes/' + id + '/statuses', {'action': action}, getConfig(basicAuthToken, cache));
+    dataFactory.updateCRStatus = function (id, data, basicAuthToken, cache) {
+      return $http.put(urlBase + 'changes/' + id + '/statuses', data, getConfig(basicAuthToken, cache));
     };
 
     dataFactory.rescheduleCR = function (id, actionAt, basicAuthToken) {
@@ -104,6 +104,7 @@ function loadCR(entry, Session) {
     businessReason: entry.businessReason,
     impact: entry.impact,
     tasks: loadTasks(entry.tasks, Session),
+    confirmationStatus: entry.confirmationStatus,
     listHtml: '<strong>' + entry.title + '</strong><br/>' +
     'Action: ' + formatDate(new Date(entry.actionAt*1000), 'd-MMM-yyyy HH:mm') + '<br/>Raiser: ' + getById(Session.users, entry.raisedBy).realName
   }
