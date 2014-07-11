@@ -57,10 +57,14 @@ function getUserByUserName(users, userName) {
   }
 }
 
-function getById(list, id) {
+function getById(list, id, nullelement, nullvalue) {
   for (i = 0; i < list.length; i++) {
     if (list[i].id == id) {
       return list[i];
     }
   }
+  // if no id found, return null for the nullelement
+  var nullreturn = {};
+  nullreturn[nullelement] = (nullvalue) ? nullvalue : null;
+  return nullreturn;
 }

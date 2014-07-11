@@ -31,6 +31,14 @@ function DataFactory($http) {
       return $http.get(urlBase + 'teams', getConfig(basicAuthToken, cache));
     };
 
+    dataFactory.getTeamUsers = function (basicAuthToken, cache) {
+      return $http.get(urlBase + 'teamUsers', getConfig(basicAuthToken, cache));
+    };
+
+    dataFactory.getSystemManagers = function (basicAuthToken, cache) {
+      return $http.get(urlBase + 'systemManagers', getConfig(basicAuthToken, cache));
+    };
+
     dataFactory.getSystemAuthorisers = function (basicAuthToken, cache) {
       return $http.get(urlBase + 'systemAuthorisers', getConfig(basicAuthToken, cache));
     };
@@ -105,7 +113,119 @@ function loadCR(entry, Session) {
     impact: entry.impact,
     tasks: loadTasks(entry.tasks, Session),
     confirmationStatus: entry.confirmationStatus,
+    comments: entry.comments,
+    authorisedBy: getById(Session.users, entry.authorisedBy, 'realName', '').realName,
+    signedOffBy: getById(Session.users, entry.signedOffBy, 'realName', '').realName,
     listHtml: '<strong>' + entry.title + '</strong><br/>' +
     'Action: ' + formatDate(new Date(entry.actionAt*1000), 'd-MMM-yyyy HH:mm') + '<br/>Raiser: ' + getById(Session.users, entry.raisedBy).realName
   }
+}
+
+function initialiseSession($scope, dataFactory, Session, callback) {
+
+  $scope.fetchUsers = function() {
+    dataFactory.getUsers(Session.basicAuthToken, true).
+      success(
+        function (resp, status, headers, config) {
+          Session.users = resp.users;
+          var u = getUserByUserName(Session.users, Session.userName);
+          Session.cmsUserId = u.id;
+          Session.realName = u.realName;
+          if (Session.userName == 'kieren.johnson') {
+            Session.realName = 'The Dude';
+          }
+          $scope.$parent.signedInAs = Session.realName;
+
+          $scope.fetchStatuses();
+        }
+      ).
+      error(function(err) {
+      // TODO: Handle error
+    });
+  }
+
+  $scope.fetchStatuses = function() {
+    dataFactory.getStatuses(Session.basicAuthToken, true).
+      success(function(resp, status, headers, config) {
+        Session.statuses = resp.changeStatuses;
+        $scope.fetchSystems();
+      }).
+      error(function(err) {
+      // TODO: Handle error
+    });
+  }
+
+  $scope.fetchSystems = function() {
+    dataFactory.getSystems(Session.basicAuthToken, true).
+      success(function(resp, status, headers, config) {
+        Session.systems = resp.systems;
+        $scope.fetchTeams();
+      }).
+      error(function(err) {
+      // TODO: Handle error
+    });
+  }
+
+
+  $scope.fetchTeams = function() {
+    dataFactory.getTeams(Session.basicAuthToken, true).
+      success(function(resp, status, headers, config) {
+        Session.teams = resp.teams;
+        $scope.fetchSystemManagers();
+      }).
+      error(function(err) {
+      // TODO: Handle error
+    });
+  }
+
+  $scope.fetchSystemManagers = function() {
+    dataFactory.getSystemManagers(Session.basicAuthToken, true).
+    success(function(resp, status, headers, config) {
+      Session.systemManagers = resp.systemManagers;
+
+      // identify the systems that this user is a manager of
+      var systems = [];
+      resp.systemManagers.forEach(function(entry, i) {
+        // search for our userId
+        entry.managers.forEach(function(e, j) {
+          if (e == Session.cmsUserId) {
+            systems.push(entry.systemId);
+          }
+        });
+      });
+      Session.signOffSystemIds = systems;
+
+      $scope.fetchAuthorisingSystems();
+    }).
+    error(function(err) {
+    // TODO: Handle error
+    });
+  }
+
+  $scope.fetchAuthorisingSystems = function() {
+    dataFactory.getSystemAuthorisers(Session.basicAuthToken, true).
+      success(function (resp, status, headers, config) {
+
+        // identify the systems that this user is an authoriser of
+        var systems = [];
+        resp.systemAuthorisers.forEach(function(entry, i) {
+          // search for our userId
+          entry.authorisers.forEach(function(e, j) {
+            if (e == Session.cmsUserId) {
+              systems.push(entry.systemId);
+            }
+          });
+        });
+
+        Session.authorisingSystemIds = systems;
+
+        callback();
+      }).
+      error(function(err) {
+      // TODO: Handle error
+    });
+  }
+
+  $scope.fetchUsers();
+
 }

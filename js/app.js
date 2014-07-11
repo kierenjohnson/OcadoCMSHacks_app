@@ -1,5 +1,10 @@
 // define the application
-var cmsHacksApp = angular.module('cmsHacksApp', ['ngRoute','ngSanitize']);
+var cmsHacksApp = angular.module('cmsHacksApp', ['ngRoute','ngSanitize'])
+  .run(function() {
+    // attach FastClick to document body
+    // this removes 300 ms click wait for mobile browsers
+    FastClick.attach(document.body);
+  });
 
 //
 cmsHacksApp.factory('dataFactory', ['$http', function($http) {
@@ -12,7 +17,6 @@ cmsHacksApp.factory('analyticsTracker', function() {
 
   // initialise google analytics service object
   service = analytics.getService('cms_hacks_app');
-  //service.getConfig().addCallback(initAnalyticsConfig);
 
   // Get a Tracker using your Google Analytics app Tracking ID.
   return tracker = service.getTracker('UA-27869830-5');
@@ -21,7 +25,10 @@ cmsHacksApp.factory('analyticsTracker', function() {
 
 // singleton service for storing session variables
 cmsHacksApp.service('Session', function () {
-  this.create = function (userName, realName, cmsUserId, authorisingSystemIds, basicAuthToken, users, systems) {
+  this.create = function (userName, realName, cmsUserId,
+                          authorisingSystemIds, basicAuthToken,
+                          users, systems, systemManagers, teamUsers, userTeams,
+                          signOffSystemIds, currentView) {
     this.userName = userName;
     this.realName = realName;
     this.cmsUserId = cmsUserId;
@@ -31,6 +38,11 @@ cmsHacksApp.service('Session', function () {
     this.systems = systems; // all cms systems
     this.statuses = statuses; // all cms status codes
     this.teams = teams; // all cms teams
+    this.systemManagers = systemManagers;
+    this.teamUsers = teamUsers; // All teams/users
+    this.userTeams = userTeams; // List of teams this user is in
+    this.signOffSystemIds = signOffSystemIds; // ids of systems this user can sign off
+    this.currentView = currentView; // signOff or pendAuth
   };
   this.destroy = function () {
     this.userName = null;
@@ -42,6 +54,11 @@ cmsHacksApp.service('Session', function () {
     this.systems = null;
     this.statuses = null;
     this.teams = null;
+    this.systemManagers = null;
+    this.teamUsers = null;
+    this.userTeams = null;
+    this.signOffSystemIds = null;
+    this.currentView = null;
   };
   return this;
 });
@@ -86,10 +103,19 @@ cmsHacksApp.factory('AuthInterceptor', function ($rootScope, $q, AUTH_EVENTS) {
   };
 });
 
-cmsHacksApp.controller('MainController', function($scope, $rootScope, $location, analyticsTracker, AUTH_EVENTS) {
+cmsHacksApp.controller('MainController', function($scope, $rootScope, $location, Session, analyticsTracker, AUTH_EVENTS) {
 
   // initialise loading spinner display to false
   $scope.loading = false;
+  $scope.signedInAs = '';
+  $scope.isDev = false;
+  chrome.storage.local.get('invertNavBar', function(obj) {
+    if(obj.invertNavBar) {
+      $scope.invertNavBar = obj.invertNavBar;
+    } else {
+      $scope.invertNavBar = false;
+    }
+  });
 
   $scope.query = {
     crId: ''
@@ -109,7 +135,42 @@ cmsHacksApp.controller('MainController', function($scope, $rootScope, $location,
   }
 
   $scope.$on(AUTH_EVENTS.notAuthenticated, function(event, mass) {
-    console.log(mass)
+    console.log(mass);
+  });
+
+  $scope.toggleNavBar = function() {
+    $scope.invertNavBar = !$scope.invertNavBar;
+    chrome.storage.local.set({'invertNavBar': $scope.invertNavBar}, function(){});
+  }
+
+  $scope.getNavBarClass = function() {
+    return ($scope.invertNavBar)?'navbar-inverse':'';
+  }
+
+  // is this running locally (development) or the chrome store version
+  // TODO: this doesn't work on ios/android
+  try {
+    if (chrome.i18n.getMessage('@@extension_id') != 'deffpdnchjjjaoimbnfjkoofjofdgkni') {
+      $scope.isDev = true;
+    }
+  } catch(err) {
+    console.log('chrome.i18n api not supported');
+  }
+
+  $scope.doViewChange = function(statusCode) {
+    $rootScope.$broadcast('VIEW_CRS', 'statusCode: ' + statusCode);
+    chrome.storage.local.set({'defaultViewStatusCode': statusCode}, function(){});
+    Session.currentView = statusCode;
+    $location.path('/changes/status/' + statusCode);
+  }
+
+  $scope.getViewActiveClass = function(statusCode) {
+    return (statusCode == Session.currentView) ? 'active':'';
+  }
+
+  // initialise Session.currentView
+  chrome.storage.local.get('defaultViewStatusCode', function(obj){
+    Session.currentView = (obj.defaultViewStatusCode) ? obj.defaultViewStatusCode : 'P';
   });
 
 });
@@ -117,7 +178,7 @@ cmsHacksApp.controller('MainController', function($scope, $rootScope, $location,
 // Controller for the login page
 // Capture login event, store session variables and
 // change page to the crsList
-cmsHacksApp.controller('LoginController',function($scope, $rootScope, $location, Session, analyticsTracker, AUTH_EVENTS) {
+cmsHacksApp.controller('LoginController',function($scope, $rootScope, $location, Session, dataFactory, analyticsTracker, AUTH_EVENTS) {
 
   // Record an "appView" each time the user launches your app or goes to a new
   // screen within the app.
@@ -147,6 +208,7 @@ cmsHacksApp.controller('LoginController',function($scope, $rootScope, $location,
 
   $scope.login = function(credentials) {
 
+    $scope.$parent.loading = true;
     analyticsTracker.sendEvent('Action', 'Login');
 
     Session.userName = credentials.username;
@@ -156,11 +218,13 @@ cmsHacksApp.controller('LoginController',function($scope, $rootScope, $location,
     chrome.storage.local.set({'cmsUserName': Session.userName}, function(){});
     // localStorage.cmsUserName = Session.userName;
 
-    // redirect
-    $location.path('/changes');
-  }
+    // Get user, system, area and team details
+    initialiseSession($scope, dataFactory, Session, function() {
+      $scope.$parent.loading = false;
+      $location.path('/changes');
+    });
 
-  // $rootScope.$broadcast(AUTH_EVENTS.notAuthenticated, 'this is a message');
+  }
 
 });
 
@@ -170,45 +234,7 @@ cmsHacksApp.controller('CRsController',
 
   analyticsTracker.sendAppView('CRListView');
 
-  $scope.cmsUserId;
-  $scope.systemAuthorisers = [];
-  $scope.systems = [];
-  $scope.crs = [];
   $scope.enableAutoRefresh = true;
-  if ($routeParams.status) {
-    $scope.viewStatusCode = $routeParams.status;
-  } else {
-    $scope.viewStatusCode = 'P';
-  }
-
-  // Response handlers
-  function usersSuccessCallback(resp, status, headers, config) {
-
-    Session.users = resp.users;
-    var u = getUserByUserName(Session.users, Session.userName);
-    Session.cmsUserId = u.id;
-    Session.realName = u.realName;
-
-    $scope.fetchAuthorisingSystems();
-  }
-
-  function systemAuthorisersSuccessCallback(resp, status, headers, config) {
-
-    var systems = [];
-
-    resp.systemAuthorisers.forEach(function(entry, i) {
-      // search for our userId
-      entry.authorisers.forEach(function(e, j) {
-        if (e == Session.cmsUserId) {
-          systems.push(entry.systemId);
-        }
-      });
-    });
-
-    Session.authorisingSystemIds = systems;
-
-    $scope.fetchCRs($scope.viewStatusCode);
-  }
 
   function crsSuccessCallback(resp, status, headers, config) {
     // var crs = [];
@@ -226,73 +252,6 @@ cmsHacksApp.controller('CRsController',
           $scope.$apply(function($scope){});
         }
       }
-    });
-  }
-
-  $scope.clearUser = function() {
-    $scope.userId = '';
-  }
-
-  $scope.clearAuthorisingSystems = function() {
-    $scope.authorisingSystems = [];
-  }
-
-  $scope.clearCRs = function() {
-    $scope.crs = [];
-  }
-
-  $scope.fetchUsers = function() {
-    this.clearUser();
-
-    dataFactory.getUsers(Session.basicAuthToken, true).
-      success(usersSuccessCallback).
-      error(function(err) {
-      // TODO: Handle error
-    });
-
-  }
-
-  $scope.fetchAuthorisingSystems = function() {
-
-    this.clearAuthorisingSystems();
-
-    dataFactory.getSystemAuthorisers(Session.basicAuthToken, true).
-      success(systemAuthorisersSuccessCallback).
-      error(function(err) {
-      // TODO: Handle error
-    });
-
-  }
-
-  $scope.fetchSystems = function() {
-    dataFactory.getSystems(Session.basicAuthToken, true).
-      success(function(resp, status, headers, config) {
-        Session.systems = resp.systems;
-        autoRefresh();
-      }).
-      error(function(err) {
-      // TODO: Handle error
-    });
-  }
-
-  $scope.fetchStatuses = function() {
-    dataFactory.getStatuses(Session.basicAuthToken, true).
-      success(function(resp, status, headers, config) {
-        Session.statuses = resp.changeStatuses;
-        $scope.fetchSystems();
-      }).
-      error(function(err) {
-      // TODO: Handle error
-    });
-  }
-
-  $scope.fetchTeams = function() {
-    dataFactory.getTeams(Session.basicAuthToken, true).
-      success(function(resp, status, headers, config) {
-        Session.teams = resp.teams;
-      }).
-      error(function(err) {
-      // TODO: Handle error
     });
   }
 
@@ -377,7 +336,7 @@ cmsHacksApp.controller('CRsController',
 
   // fetch details every 10 seconds
   var autoRefresh = function() {
-    if ($scope.enableAutoRefresh) $scope.fetchUsers();
+    if ($scope.enableAutoRefresh) $scope.fetchCRs($scope.viewStatusCode);
     $timeout(autoRefresh, 20000);
   }
 
@@ -386,9 +345,25 @@ cmsHacksApp.controller('CRsController',
     $scope.enableAutoRefresh = false;
   });
 
-  // this will start chain of get requests
-  $scope.fetchStatuses();
-  $scope.fetchTeams();
+  $scope.$on('VIEW_CRS', function(event, mass) {
+    console.log('VIEW_CRS event: disable auto refresh of this CRs list (another is being opened)')
+    $scope.enableAutoRefresh = false;
+  });
+
+  if ($routeParams.status) {
+    $scope.viewStatusCode = $routeParams.status;
+    autoRefresh();
+  } else {
+    chrome.storage.local.get('defaultViewStatusCode', function(obj) {
+      if(obj.defaultViewStatusCode) {
+        $scope.viewStatusCode = obj.defaultViewStatusCode;
+      } else {
+        $scope.viewStatusCode = 'P';
+      }
+      autoRefresh();
+    });
+
+  }
 
 });
 
@@ -398,6 +373,7 @@ cmsHacksApp.controller('CRController', function($scope, $rootScope, $routeParams
   analyticsTracker.sendAppView('CRDetailView');
 
   $scope.$parent.loading = true;
+  $scope.showComments = false;
 
   function crSuccessCallback(resp, status, headers, config) {
     $scope.cr = loadCR(resp.changes, Session);
@@ -419,6 +395,12 @@ cmsHacksApp.controller('CRController', function($scope, $rootScope, $routeParams
       switch (action) {
       case "Authorise":
         if ($scope.cr.statusCode == 'E' || $scope.cr.statusCode == 'P') {
+          return true;
+        }
+        return false;
+        break;
+      case "SignOff":
+        if ($scope.cr.statusCode == 'M') {
           return true;
         }
         return false;
@@ -475,6 +457,10 @@ cmsHacksApp.controller('CRController', function($scope, $rootScope, $routeParams
       // TODO: Handle error
       $scope.$parent.loading = false;
     });
+  }
+
+  $scope.toggleComments = function() {
+    $scope.showComments = !$scope.showComments;
   }
 
   // get CR

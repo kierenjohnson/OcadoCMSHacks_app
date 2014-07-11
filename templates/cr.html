@@ -8,7 +8,7 @@
     <dt>Impact</dt>
     <dd ng-bind-html="cr.impact | breakFilter | htmlLinky"></dd>
   </dl>
-  <table id="crSubDetailTable" class="table table-bordered table-condensed">
+  <table id="crSubDetailTable" class="table table-bordered table-condensed table-collapse">
     <thead>
       <tr>
         <th>CR#</th>
@@ -26,7 +26,7 @@
       </tr>
     </tbody>
   </table>
-  <table id="crTasksTable" class="table table-bordered table-condensed">
+  <table id="crTasksTable" class="table table-bordered table-condensed table-collapse">
     <thead>
       <tr>
         <th>Tasks</th>
@@ -40,12 +40,25 @@
       </tr>
     </tbody>
   </table>
+  <table id="crCommentsTable" class="table table-bordered table-condensed table-collapse">
+    <thead>
+      <tr>
+        <th><a ng-click="toggleComments()" target="_self" title="Toggle Comments">Comments</a></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td ng-show="showComments" ng-bind-html="cr.comments | breakFilter"></td>
+      </tr>
+    </tbody>
+  </table>
 </div>
 <div id="footer">
   <div class="container">
     <p><a href="#/changes/status/{{cr.statusCode}}">Return</a> |
-      <a class="pseudoLink" ng-click="doStatusChange(cr,'authorise')" target="_self" ng-show="showAction('Authorise')" title="Authorise">Authorise</a> |
-      <a class="pseudoLink" ng-click="doStatusChange(cr,'reject')" target="_self" ng-show="showAction('Reject')" title="Reject">Reject</a> |
-      <a class="pseudoLink" ng-click="doStatusChange(cr,'confirm','true')" target="_self" ng-show="showAction('Confirm')" title="Confirm">Confirm</a></p>
+      <span ng-show="showAction('Authorise')"><a class="pseudoLink" ng-click="doStatusChange(cr,'authorise')" target="_self" title="Authorise">Authorise</a> |</span>
+      <span ng-show="showAction('SignOff')"><a class="pseudoLink" ng-click="doStatusChange(cr,'signoff')" target="_self" title="Sign Off">Sign Off</a> |</span>
+      <span ng-show="showAction('Reject')"><a class="pseudoLink" ng-click="doStatusChange(cr,'reject')" target="_self" title="Reject">Reject</a> |</span>
+      <span ng-show="showAction('Confirm')"><a class="pseudoLink" ng-click="doStatusChange(cr,'confirm','true')" target="_self" title="Confirm">Confirm</a></span></p>
   </div>
 </div>
