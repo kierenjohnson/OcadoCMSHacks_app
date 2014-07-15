@@ -74,15 +74,6 @@ cmsHacksApp.constant('AUTH_EVENTS', {
 });
 
 // create an authentication interceptor
-cmsHacksApp.config(function ($httpProvider) {
-  $httpProvider.interceptors.push([
-    '$injector',
-    function ($injector) {
-      return $injector.get('AuthInterceptor');
-    }
-  ]);
-});
-
 cmsHacksApp.factory('AuthInterceptor', function ($rootScope, $q, AUTH_EVENTS) {
   return {
     responseError: function (response) {
@@ -103,6 +94,15 @@ cmsHacksApp.factory('AuthInterceptor', function ($rootScope, $q, AUTH_EVENTS) {
   };
 });
 
+cmsHacksApp.config(function ($httpProvider) {
+  $httpProvider.interceptors.push([
+    '$injector',
+    function ($injector) {
+      return $injector.get('AuthInterceptor');
+    }
+  ]);
+});
+
 cmsHacksApp.controller('MainController', function($scope, $rootScope, $location, Session, analyticsTracker, AUTH_EVENTS) {
 
   // initialise loading spinner display to false
@@ -116,6 +116,16 @@ cmsHacksApp.controller('MainController', function($scope, $rootScope, $location,
       $scope.invertNavBar = false;
     }
   });
+
+  $scope.alerts = [];
+
+  $scope.addAlert = function(type, mssg) {
+    $scope.alerts.push({type: type, msg: mssg});
+  }
+
+  $scope.closeAlert = function(index) {
+    $scope.alerts.splice(index, 1);
+  }
 
   $scope.query = {
     crId: ''
@@ -136,6 +146,11 @@ cmsHacksApp.controller('MainController', function($scope, $rootScope, $location,
 
   $scope.$on(AUTH_EVENTS.notAuthenticated, function(event, mass) {
     console.log(mass);
+    $scope.addAlert('danger', 'Not authenticated');
+  });
+  $scope.$on(AUTH_EVENTS.notAuthorized, function(event, mass) {
+    console.log(mass);
+    $scope.addAlert('danger', 'Not authorised.');
   });
 
   $scope.toggleNavBar = function() {
@@ -291,7 +306,7 @@ cmsHacksApp.controller('CRsController',
           if (systemsCounter == systemsLength) {
             // update scope crs
             if (newCRsList.length == 0) {
-              newCRsList.push({listHtml: '<p class="text-center"><strong>Nothing to see here</strong><br/><small>Are your teams working hard enough?</small></p>'});
+              newCRsList.push({listHtml: '<p class="text-center"><strong>Nothing to see here</strong><br/><small>Move along.</small></p>'});
             }
             $scope.crs = newCRsList;
             if(!$scope.$$phase) {

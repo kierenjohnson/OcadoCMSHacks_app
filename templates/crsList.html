@@ -13,10 +13,17 @@
   </ul>
 </div>
 <div id="footer">
-  <div class="container">
-    <span ng-show="true" class="pull-right">
-      <span class="glyphicon glyphicon-flash" title="Disonnected"></span>
-    </span>
-    <p><a class="pseudoLink" ng-click="doLogout()" target="_self">Logout</a></p>
+  <div class="container-fluid">
+    <div class="row">
+      <div class="col-xs-4">
+        <p><a class="pseudoLink" ng-click="doLogout()" target="_self">Logout</a></p>
+      </div>
+      <div class="col-xs-4 text-center"><p ng-show="isLoggedIn()">{{signedInAs}}</p></div>
+      <div class="col-xs-4">
+        <span ng-show="true" class="pull-right">
+          <span class="glyphicon glyphicon-flash" title="Disonnected"></span>
+        </span>
+      </div>
+    </div>
   </div>
 </div>
