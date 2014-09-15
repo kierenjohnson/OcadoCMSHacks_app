@@ -1,3 +1,6 @@
+/* jshint undef: true, unused: true */
+/* global chrome */
+
 // launch main application window
 chrome.app.runtime.onLaunched.addListener(function() {
   chrome.app.window.create('../main.html', {

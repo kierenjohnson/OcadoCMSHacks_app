@@ -9,7 +9,9 @@
   <h2 class="form-signin-heading">Please sign in</h2>
   <input type="text" id="username" class="form-control" placeholder="Username"
          ng-model="credentials.username" autocapitalize="off" required autofocus>
-  <input type="password" id="password" class="form-control" ng-model="credentials.password" required>
+  <input type="password" id="password" class="form-control" ng-model="credentials.password"
+        placeholder="Password" required>
   <button class="btn btn-lg btn-primary btn-block" type="submit">Login</button>
+  <p class="pull-right"><small>v{{applicationVersion}}</small></p>
 </form>
 </div>

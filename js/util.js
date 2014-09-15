@@ -50,7 +50,7 @@ function getActionDateClass(actionDateTimeMilli) {
 
 // utility functions to find stuff from id/username
 function getUserByUserName(users, userName) {
-  for (i = 0; i < users.length; i++) {
+  for (var i = 0; i < users.length; i++) {
     if (users[i].userName == userName) {
       return users[i];
     }
@@ -58,7 +58,7 @@ function getUserByUserName(users, userName) {
 }
 
 function getById(list, id, nullelement, nullvalue) {
-  for (i = 0; i < list.length; i++) {
+  for (var i = 0; i < list.length; i++) {
     if (list[i].id == id) {
       return list[i];
     }
@@ -67,4 +67,8 @@ function getById(list, id, nullelement, nullvalue) {
   var nullreturn = {};
   nullreturn[nullelement] = (nullvalue) ? nullvalue : null;
   return nullreturn;
+}
+
+function logEvent(eventHistory, eventMsg) {
+  eventHistory.push({date: new Date(), message: eventMsg});
 }

@@ -1,0 +1,19 @@
+<!--<div class="container">
+  <ul class="nav nav-tabs" role="tablist">
+  <li class="active"><a href="#">Auth</a></li>
+  <li><a href="#/changes/status/E">Expired</a></li>
+  <li><a href="#/changes/status/F">Finished</a></li>
+</ul>
+</div>-->
+<div class="container">
+  <ul>
+    <li ng-repeat="event in events | orderObjectBy:'date'">
+      {{event.date | date: 'd-MMM-yyyy HH:mm'}} - {{event.message}}
+    </li>
+  </ul>
+</div>
+<div id="footer">
+  <div class="container">
+    <p><a href="#/changes/" class="btn btn-default" role="button">Return</a></p>
+  </div>
+</div>

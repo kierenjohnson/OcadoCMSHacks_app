@@ -1,6 +1,8 @@
 <div class="container">
   <h4 ng-bind-html="task.title"></h4>
   <dl class="dl-horizontal">
+    <dt>Status</dt>
+    <dd>{{task.status}}</dd><br/>
     <dt>Details</dt>
     <dd ng-bind-html="task.details | breakFilter | htmlLinky"></dd><br/>
     <dt>Backout</dt>
@@ -25,6 +27,6 @@
 </div>
 <div id="footer">
   <div class="container">
-    <p><a href="#/changes/{{task.changeId}}">Return</a></p>
+    <p><a href="#/changes/{{task.changeId}}" class="btn btn-default" role="button">Return</a></p>
   </div>
 </div>

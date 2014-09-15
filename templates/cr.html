@@ -1,6 +1,10 @@
 <div class="container">
   <h4 ng-bind-html="cr.title"></h4>
   <dl class="dl-horizontal">
+    <dt>Raiser</dt>
+    <dd>{{cr.raisedBy}}</dd><br/>
+    <dt>System</dt>
+    <dd>{{cr.system}}</dd><br/>
     <dt>Business Reason</dt>
     <dd ng-bind-html="cr.businessReason | breakFilter | htmlLinky"></dd><br/>
     <dt>Details</dt>
@@ -12,7 +16,6 @@
     <thead>
       <tr>
         <th>CR#</th>
-        <th>System</th>
         <th>Go Live Date</th>
         <th>Status</th>
       </tr>
@@ -20,9 +23,24 @@
     <tbody>
       <tr>
         <td>{{cr.id}}</td>
-        <td>{{cr.system}}</td>
         <td ng-class="getActionDateClass(cr.actionDate)">{{cr.actionDate | date: 'd-MMM-yyyy HH:mm'}}</td>
         <td>{{cr.status}}</td>
+      </tr>
+    </tbody>
+  </table>
+  <table id="crPreReqTasksTable" ng-show="showPreReqTasks()" class="table table-bordered table-condensed table-collapse">
+    <thead>
+      <tr>
+        <th>Pre-requisite Tasks</th>
+        <th>Team</th>
+        <th>Completed</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr ng-repeat="prereq in cr.preRequisiteTasks | orderObjectBy:'id'">
+        <td><a href="#/prereqTasks/{{prereq.id}}" >{{prereq.title}}</a></td>
+        <td>{{prereq.team}}</td>
+        <td>{{prereq.completed}}</td>
       </tr>
     </tbody>
   </table>
@@ -31,12 +49,16 @@
       <tr>
         <th>Tasks</th>
         <th>Team</th>
+        <th>Date</th>
+        <th>Status</th>
       </tr>
     </thead>
     <tbody>
-      <tr ng-repeat="task in cr.tasks | orderObjectBy:'id'">
+      <tr ng-repeat="task in cr.tasks | orderObjectBy:'actionDate'">
         <td><a href="#/tasks/{{task.id}}" >{{task.title}}</a></td>
         <td>{{task.team}}</td>
+        <td>{{task.actionDate | date: 'd-MMM-yyyy HH:mm'}}</td>
+        <td>{{task.status}}</td>
       </tr>
     </tbody>
   </table>
@@ -55,10 +77,11 @@
 </div>
 <div id="footer">
   <div class="container">
-    <p><a href="#/changes/status/{{cr.statusCode}}">Return</a> |
-      <span ng-show="showAction('Authorise')"><a class="pseudoLink" ng-click="doStatusChange(cr,'authorise')" target="_self" title="Authorise">Authorise</a> |</span>
-      <span ng-show="showAction('SignOff')"><a class="pseudoLink" ng-click="doStatusChange(cr,'signoff')" target="_self" title="Sign Off">Sign Off</a> |</span>
-      <span ng-show="showAction('Reject')"><a class="pseudoLink" ng-click="doStatusChange(cr,'reject')" target="_self" title="Reject">Reject</a> |</span>
-      <span ng-show="showAction('Confirm')"><a class="pseudoLink" ng-click="doStatusChange(cr,'confirm','true')" target="_self" title="Confirm">Confirm</a></span></p>
+    <p><a href="#/changes/status/{{cr.statusCode}}" class="btn btn-default" role="button">Return</a>
+        <span ng-show="showAction('Authorise')"><button class="btn btn-success"  ng-click="doStatusChange(cr,'authorise',{})" title="Authorise">Authorise</button></span>
+        <span ng-show="showAction('SignOff')"><button class="btn btn-success" ng-click="doStatusChange(cr,'signoff',{testingStatus:'T'})" title="Sign Off">Sign Off</button></span>
+        <span ng-show="showAction('Reject')"><button class="btn btn-warning" ng-click="doStatusChange(cr,'reject',{})" title="Reject">Reject</button></span>
+        <span ng-show="showAction('Confirm')"><button class="btn btn-success" ng-click="doStatusChange(cr,'confirm',{success:'true'})" title="Confirm">Confirm</button></span>
+        <span ng-show="showAction('Refresh')"><button class="btn btn-default" ng-click="initialise()" title="Refresh">Refresh</button></span></p>
   </div>
 </div>

@@ -1,8 +1,10 @@
-"use strict";
+/* jshint undef: true, unused: true */
+/* global formatDate, getById, getUserByUserName */
 
 function DataFactory($http) {
+    'use strict';
 
-    var urlBase = 'http://change.ocado.com/change/ws/v2/';
+    var urlBase = 'https://change.ocado.com/change/ws/v2/';
     var dataFactory = {};
 
     function getConfig(basicAuthToken, cache) {
@@ -51,6 +53,10 @@ function DataFactory($http) {
       return $http.get(urlBase + 'tasks/' + id, getConfig(basicAuthToken, cache));
     };
 
+    dataFactory.getPreReqTask = function (id, basicAuthToken, cache) {
+      return $http.get(urlBase + 'prereqTasks/' + id, getConfig(basicAuthToken, cache));
+    };
+
     dataFactory.getCRs = function (options, basicAuthToken, cache) {
       var url = urlBase + 'changes?query=system=' + options.systemId + '!status=' + options.status;
       if (options.afterDate) {
@@ -87,13 +93,13 @@ function loadTask(entry, Session) {
     team: getById(Session.teams, entry.teamId).teamName,
     backout: entry.backout,
     changeId: entry.changeId
-  }
+  };
 }
 
 function loadTasks(tasks, Session) {
   var result = [];
-  for (i = 0; i < tasks.length; i++) {
-    result.push(loadTask(tasks[i], Session));
+  for (var j = 0; j < tasks.length; j++) {
+    result.push(loadTask(tasks[j], Session));
   }
   return result;
 }
@@ -112,82 +118,91 @@ function loadCR(entry, Session) {
     businessReason: entry.businessReason,
     impact: entry.impact,
     tasks: loadTasks(entry.tasks, Session),
+    preRequisiteTasks: loadTasks(entry.prerequisiteTasks, Session),
     confirmationStatus: entry.confirmationStatus,
     comments: entry.comments,
     authorisedBy: getById(Session.users, entry.authorisedBy, 'realName', '').realName,
     signedOffBy: getById(Session.users, entry.signedOffBy, 'realName', '').realName,
     listHtml: '<strong>' + entry.title + '</strong><br/>' +
     'Action: ' + formatDate(new Date(entry.actionAt*1000), 'd-MMM-yyyy HH:mm') + '<br/>Raiser: ' + getById(Session.users, entry.raisedBy).realName
-  }
+  };
 }
 
 function initialiseSession($scope, dataFactory, Session, callback) {
 
+  // nb Removed caching from getUsers as it allows us to catch
+  // authentication failures on the first request
   $scope.fetchUsers = function() {
-    dataFactory.getUsers(Session.basicAuthToken, true).
+    dataFactory.getUsers(Session.basicAuthToken, false).
       success(
-        function (resp, status, headers, config) {
+        function (resp) {
           Session.users = resp.users;
           var u = getUserByUserName(Session.users, Session.userName);
-          Session.cmsUserId = u.id;
-          Session.realName = u.realName;
-          if (Session.userName == 'kieren.johnson') {
-            Session.realName = 'The Dude';
-          }
-          $scope.$parent.signedInAs = Session.realName;
 
-          $scope.fetchStatuses();
+          // if username was not found then we need to throw an error
+          if (typeof u == 'undefined') {
+            $scope.$broadcast('ERR_USERNAME_NOT_FOUND', Session.userName);
+          } else {
+            Session.cmsUserId = u.id;
+            Session.realName = u.realName;
+            if (Session.userName == 'kieren.johnson') {
+              Session.realName = 'The Dude';
+            }
+            $scope.$parent.signedInAs = Session.realName;
+
+            $scope.fetchStatuses();
+          }
         }
       ).
-      error(function(err) {
+      error(function() {
       // TODO: Handle error
     });
-  }
+  };
 
   $scope.fetchStatuses = function() {
     dataFactory.getStatuses(Session.basicAuthToken, true).
-      success(function(resp, status, headers, config) {
+      success(function(resp) {
         Session.statuses = resp.changeStatuses;
         $scope.fetchSystems();
       }).
-      error(function(err) {
+      error(function() {
       // TODO: Handle error
     });
-  }
+  };
 
   $scope.fetchSystems = function() {
     dataFactory.getSystems(Session.basicAuthToken, true).
-      success(function(resp, status, headers, config) {
+      success(function(resp) {
         Session.systems = resp.systems;
         $scope.fetchTeams();
       }).
-      error(function(err) {
+      error(function() {
       // TODO: Handle error
     });
-  }
+  };
 
 
   $scope.fetchTeams = function() {
     dataFactory.getTeams(Session.basicAuthToken, true).
-      success(function(resp, status, headers, config) {
+      success(function(resp) {
         Session.teams = resp.teams;
         $scope.fetchSystemManagers();
       }).
-      error(function(err) {
+      error(function() {
       // TODO: Handle error
     });
-  }
+  };
 
   $scope.fetchSystemManagers = function() {
     dataFactory.getSystemManagers(Session.basicAuthToken, true).
-    success(function(resp, status, headers, config) {
+    success(function(resp) {
       Session.systemManagers = resp.systemManagers;
 
       // identify the systems that this user is a manager of
       var systems = [];
-      resp.systemManagers.forEach(function(entry, i) {
+      resp.systemManagers.forEach(function(entry) {
         // search for our userId
-        entry.managers.forEach(function(e, j) {
+        entry.managers.forEach(function(e) {
           if (e == Session.cmsUserId) {
             systems.push(entry.systemId);
           }
@@ -197,20 +212,20 @@ function initialiseSession($scope, dataFactory, Session, callback) {
 
       $scope.fetchAuthorisingSystems();
     }).
-    error(function(err) {
+    error(function() {
     // TODO: Handle error
     });
-  }
+  };
 
   $scope.fetchAuthorisingSystems = function() {
     dataFactory.getSystemAuthorisers(Session.basicAuthToken, true).
-      success(function (resp, status, headers, config) {
+      success(function (resp) {
 
         // identify the systems that this user is an authoriser of
         var systems = [];
-        resp.systemAuthorisers.forEach(function(entry, i) {
+        resp.systemAuthorisers.forEach(function(entry) {
           // search for our userId
-          entry.authorisers.forEach(function(e, j) {
+          entry.authorisers.forEach(function(e) {
             if (e == Session.cmsUserId) {
               systems.push(entry.systemId);
             }
@@ -221,10 +236,10 @@ function initialiseSession($scope, dataFactory, Session, callback) {
 
         callback();
       }).
-      error(function(err) {
+      error(function() {
       // TODO: Handle error
     });
-  }
+  };
 
   $scope.fetchUsers();
 
