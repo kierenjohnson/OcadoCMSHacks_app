@@ -395,6 +395,11 @@ angular.module('cmsHacksApp', ['ngRoute','ngSanitize','ui.bootstrap'])
     $scope.enableAutoRefresh = false;
   });
 
+  $scope.$on(AUTH_EVENTS.notAuthorized, function() {
+    // if there is an authorisation failure disable auto refresh
+    $scope.enableAutoRefresh = false;
+  });
+
   if ($routeParams.status) {
     $scope.viewStatusCode = $routeParams.status;
     autoRefresh();

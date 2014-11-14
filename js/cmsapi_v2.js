@@ -77,6 +77,20 @@ function DataFactory($http) {
       return $http.post(urlBase + 'changes/createEditChangeAction', cr, getConfig(basicAuthToken));
     };
 
+    /* PreProds */
+    dataFactory.getPreProds = function(options, basicAuthToken, cache) {
+      var url = urlBase + 'preprods?query=system=' + options.systemId + '!status=' + options.status;
+      if (options.afterDate) {
+        url = url + '!after=' + formatDate(new Date(options.afterDate), 'dd/MM/yyyy_HH:mm');
+      }
+      return $http.get(url, getConfig(basicAuthToken, cache));
+    }
+
+    dataFactory.getPreProd = function (id, basicAuthToken, cache) {
+      return $http.get(urlBase + 'preprods/' + id, getConfig(basicAuthToken, cache));
+    };
+    /* /PreProds */
+    
     return dataFactory;
 }
 
